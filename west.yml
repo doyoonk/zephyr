@@ -144,7 +144,7 @@ manifest:
       groups:
         - fs
     - name: hal_adi
-      revision: eeb155f7382343438114605963ae64436cc53434
+      revision: 4a189d5d2d20267084d9066cd0c4548dd730f809
       path: modules/hal/adi
       groups:
         - hal
@@ -240,7 +240,7 @@ manifest:
       groups:
         - hal
     - name: hal_silabs
-      revision: 5d75cba8a1b0e9a747ae387d9ffbb1bf7cd8c529
+      revision: b1510f2c86b918163070f3a540e51cac8160302d
       path: modules/hal/silabs
       groups:
         - hal
@@ -316,7 +316,7 @@ manifest:
       revision: b03edc8e6282a963cd312cd0b409eb5ce263ea75
       path: modules/lib/gui/lvgl
     - name: mbedtls
-      revision: c5b06d89c9c498d8fc8659ce31f7e53137b6270f
+      revision: 11c0f18ab888fed4363eeeb43fd734246dc3c93b
       path: modules/crypto/mbedtls
       groups:
         - crypto

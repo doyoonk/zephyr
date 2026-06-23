@@ -26,6 +26,244 @@
 
 .. _zephyr_4.3:
 
+.. _zephyr_4.3.1:
+
+Zephyr 4.3.1
+############
+
+This is a maintenance release with fixes.
+
+Issues Fixed
+************
+
+These GitHub issues were addressed since the previous 4.3.0 tagged release:
+
+.. comment  List derived from GitHub Issue query: ...
+   * :github:`issuenumber` - issue title
+
+* :github:`55186` - posix: :c:func:`fnmatch`: fix known bugs
+* :github:`61464` - USB device stack (new and old) assertion on STM32
+* :github:`95359` - ``spi_loopback`` fails on ``frdm_rw612`` with DMA and/or ``cs_loopback``
+* :github:`96699` - drivers: spi: nrf_spim: Unused function warning when
+  :kconfig:option:`CONFIG_DEVICE_DEINIT_SUPPORT` is disabled
+* :github:`96762` - drivers: serial: uart_nrfx_uarte: Unused function warning when
+  :kconfig:option:`CONFIG_DEVICE_DEINIT_SUPPORT` is disabled
+* :github:`98491` - riscv: userspace: undefined symbol: :c:func:`z_stack_space_get`
+* :github:`98501` - pm: device_runtime: Issues with set/clear ``PD_CLAIMED`` flag in
+  ``ISR_SAFE`` context
+* :github:`98523` - ring_buffer: :c:func:`ring_buf_init` may trigger assertion depending on Kconfig
+* :github:`98588` - drivers: i2c: dw_i2c: i2c read time out on certain type of ``DW_I2C``
+* :github:`98768` - STM32F303 bxCAN: Last 2 bytes corrupted on TX pin, but registers are correct
+* :github:`98782` - esp32c6: esp32h2: OpenThread issue
+* :github:`98797` - boards: nxp: ``mimxrt1180_evk``: J-Link script file not used when debugging
+* :github:`99099` - STM32 QSPI sample shifting prevents communication with ``GD25Q128E`` flash chip
+* :github:`99453` - sensor: current-amp: ``zero-current-offset`` no longer works
+* :github:`99490` - MAX32650 SoC system clock configuration problem
+* :github:`99491` - hwinfo: hwinfo test fails for MAX32657EVKIT board
+* :github:`99535` - Issue with STM32 Ethernet and KSZ8081 Phy
+* :github:`99563` - RP2350 Hazard3 doesn't default to XIP
+* :github:`99588` - Bluetooth: Controller: nRF54Lx Radio Tx Power incorrect
+* :github:`99644` - Siwx91x Compilation error with PM
+* :github:`99659` - OpenThread Border Router issues in 4.3.0 release
+* :github:`99682` - net: lib: dns: Unpacking query name can overflow the destination buffer
+* :github:`99762` - mcumgr: Image management incorrectly identifies active slot when slots are on
+  different flash devices
+* :github:`99792` - HTTP Server Shows Error Log Message when iface goes down
+* :github:`99795` - Telnet Shell Server Shows Error Log Message when iface goes down
+* :github:`99797` - MCUmgr: OS: DateTime: Millisecond parsing erroneous
+* :github:`99822` - stm32 EXTI driver: add support for STM32N6
+* :github:`99895` - ``npcx9m6f_evb`` and ``frdm_k64f``:
+  ``kernel.common.stack_protection_arm_fpu_sharing`` fails
+* :github:`99901` - drivers: entropy: gecko_trng: Error when getting entropy too soon after init
+* :github:`99904` - soc: silabs: siwx91x: irq prio misalignment with hal
+* :github:`99948` - drivers: ice40_fpga: :c:func:`k_usleep` while holding a spinlock
+* :github:`100040` - timer: cortex_m_systick: Compilation error if
+  :kconfig:option:`CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME` is defined
+* :github:`100211` - soc: silabs: siwx91x: ADC driver returns constant 0 mV
+* :github:`100212` - No event code filterint for LVGL pointer process
+* :github:`100225` - bluetooth: :c:struct:`bt_conn` reference leak in Frame Space Update in
+  Zephyr 4.3.0
+* :github:`100296` - ``west packages pip --install`` fails with permission error
+* :github:`100715` - mgmt: mcumgr: firmware loader allows for self erasure
+* :github:`100754` - bt test commands not working/crashing for nRF54LM20A DK board
+* :github:`100903` - drivers: flash: stm32 ospi: detected erase type is always resetted
+* :github:`101048` - drivers: xen: Uninitialized variable warning
+* :github:`101151` - drivers: serial: NXP uart_mcux_flexcomm: instance interrupt config not saved
+  during :c:enum:`PM_DEVICE_ACTION_TURN_OFF`
+* :github:`101236` - NXP: Failed to disable ``random-mac-address`` in ethernet driver.
+* :github:`101401` - logging: thread starvation for lower-priority producers
+* :github:`101414` - :c:macro:`ZVFS_OPEN_SIZE` define applied irrespective of configuration
+* :github:`101416` - It seems TCP accept had some issue during link changes
+* :github:`102129` - Flash incorrectly tested on MAX32657 NS due to ``storage_partition``
+* :github:`102635` - gpio: mcux: Potential infinite interrupt hang when configuring
+* :github:`102995` - OpenThread: build fails with :kconfig:option:`CONFIG_OPENTHREAD_MTD` enabled
+* :github:`103029` - NVS startup fails after power loss during final ATE write
+* :github:`103140` - TCAN4x5x initialization stalls with latest driver changes
+* :github:`103239` - Race condition on usart/eusart silabs driver
+* :github:`103242` - Watchdog timer on Siwx91x devices is not on pause during deep sleep
+* :github:`103329` - Shared Flash access might be corrupted on SiWx91x SoC
+* :github:`103339` - PM on SiWG91x SoC is broken
+* :github:`103365` - MAX32655 UART fails to send some bytes on Zephyr 4.3
+* :github:`103962` - RTIO: SQE flags not zeroed by some functions
+* :github:`104208` - IPv4/6 fragmentation memory leak
+* :github:`104248` - DNS query packet length check
+* :github:`104253` - driver: clock_control: ``RCC_BDCR_LSEDRV_Pos`` undefined using STM32L0
+* :github:`104652` - net: socketcan: length not always verified
+* :github:`104748` - mcumgr: error codes of group "stat" incorrect
+* :github:`104948` - net: lib: socket: tls: Potential out-of-bounds write in
+  :c:member:`socket_op_vtable.connect`
+* :github:`105038` - net: lib: sockets: tls: Improve socket address storage
+* :github:`105106` - arc: mpu: MPUv6 buffer validation race condition causes spurious access denials
+* :github:`105216` - drivers: timer: stm32_lptim: fix incorrect configuration and harden against
+  wrong usage
+* :github:`105374` - drivers: gpio: sam: callback called when interrupt disabled
+* :github:`105644` - SNTP uncertainty option invalids :c:func:`sntp_query`
+* :github:`105754` - net: sockets: ``msg->msg_iovlen`` is not validated in
+  :c:func:`zsock_recvmsg` sys call
+* :github:`106109` - wifi: wifi_credentials: Static credentials are not validated
+* :github:`106291` - Build fails when
+  :kconfig:option:`CONFIG_OPENTHREAD_CONFIG_DIAG_ENABLE` is enabled.
+* :github:`106334` - Thread-safety race condition in :c:func:`net_buf_unref`
+* :github:`106776` - net: tcp: Non-blocking connect failure leaks SYN retransmissions
+* :github:`106894` - update Mbed TLS to 3.6.6
+* :github:`106991` - net: tcp: use-after-free in :c:func:`net_tcp_foreach` causes bus fault
+* :github:`107081` - McuMgr ``fs_mgmt_file_upload`` handler does not check partial writes to
+  filesystem
+* :github:`107096` - ``cc3220sf_launchxl``/``cc3220sf`` missing ZVFS selection in sample
+* :github:`107900` - net: ipv6: Neighbor Discovery packets validation is incorrect
+* :github:`107920` - net: icmp: assert triggered sending icmp echo response with
+  :kconfig:option:`CONFIG_NET_STATISTICS`
+* :github:`107928` - net: lib: http_server: fix in websocket
+* :github:`108004` - drivers: entropy: stm32: bad locking sequence
+* :github:`108149` - Renaming configuration file in WiFi Shell sample causes errors when building
+  the associated board documentation
+* :github:`108559` - IP address parsing issue
+* :github:`108637` - :file:`tests/drivers/bbram/generic/` fails at random due to
+  :file:`drivers/bbram/bbram_microchip_mcp7940n_emul.c`
+* :github:`108835` - adin2111: Communication gets stuck after high bandwidth transfer
+* :github:`108846` - Validate DNS rdata length in :c:func:`dns_unpack_answer`
+* :github:`108848` - wifi: nrf70: Missing bounds check on TWT event buffer
+* :github:`108963` - net: lwm2m: URI string may be unterminated in FW pull mode
+* :github:`109053` - native_sim: FUSE files are opened write-only
+* :github:`109063` - The issue in Bluetooth Mesh solicitation PDU parsing
+* :github:`109128` - fs: backend file resource leak when :c:func:`fs_open` with ``FS_O_TRUNC``
+  fails during truncate
+* :github:`109133` - Undefined bitwise shift behavior in PTP port management interval handling
+* :github:`109257` - xtensa: mpu: fix :c:func:`arch_buffer_validate` on overflow
+* :github:`109549` - Security advisory GHSA-4vqm-pw24-g9jp / CVE 2026-5590 fix not available for
+  Zephyr 4.3
+* :github:`109620` - Bluetooth: Controller: Fix OOB read in ISOAL
+* :github:`109857` - posix: mqueue: fix integer overflow in :c:func:`mq_open` buffer allocation
+* :github:`110032` - fs: ext2: validate directory entry structure before traversal
+* :github:`110077` - :c:func:`k_pipe_read` in ISR causing fault
+* :github:`110303` - Bluetooth: Mesh: PrivateBeaconKey PSA key leak after subnet deletion
+* :github:`110393` - bluetooth: l2cap: validate ``alloc_buf`` user data
+* :github:`110645` - net: sockets: :c:func:`zsock_recvmsg` ancillary-data capacity check undercounts
+  cmsg size
+* :github:`110651` - usb: device_next: cdc_ncm: TX thread deadlocks when
+  :c:func:`usbd_ep_enqueue` fails
+* :github:`110762` - bluetooth: classic: hfp_hf: :c:func:`cind_handle_values` writes past
+  ``ind_table`` on a long ``+CIND`` list
+* :github:`110766` - drivers: serial: pl011: TX enable spins forever when CTS flow control blocks
+  transmission
+* :github:`110771` - net: sockets: :c:func:`zsock_getaddrinfo` retry after a DNS timeout leaves the
+  previous query in flight and touches stale stack state
+* :github:`110775` - Bluetooth: BAP: unicast client dereferences NULL ``stream->qos`` when a QoS
+  Configured notification arrives before the stream is added to a group
+* :github:`110857` - net: sntp: close-while-polling use-after-free in :c:func:`sntp_close_async`
+* :github:`110866` - net: dns: ``.local`` suffix check reads past the end of the hostname string
+* :github:`110915` - pb-adv bearer resets the protocol timer unconditionally
+* :github:`110956` - Bluetooth: ISO: :c:func:`bt_iso_recv` pulls the SDU header without checking
+  ``buf->len``
+* :github:`110967` - Bluetooth: BAP: Broadcast Assistant shares one ``att_buf`` across all
+  connections
+* :github:`111016` - kernel: userspace: dynamic kernel-object list freed under a different lock than
+  it is traversed
+* :github:`111031` - :file:`tests/drivers/can/api/drivers.can.api` fails on mutex
+* :github:`111087` - kernel: userspace: :c:func:`k_thread_name_copy` syscall dereferences NULL for an
+  unregistered thread pointer
+* :github:`111100` - kernel: pipe: a user thread can re-initialize a pipe that is already in use
+* :github:`111110` - kernel: poll: :c:func:`z_vrfy_k_poll` leaks ``events_copy`` when a
+  ``k_poll_event`` carries an invalid object handle
+* :github:`111116` - pmci: mctp: I2C+GPIO target writes received bytes through an unchecked/unallocated
+  packet buffer
+* :github:`111119` - drivers: spi: dw: :c:func:`spi_dw_configure` uses ``config->frequency`` as a
+  divisor without validating it
+* :github:`111345` - net: http_server: static filesystem handler serves files outside the web root
+  for paths containing ``".."``
+* :github:`111416` - logging: :c:func:`z_vrfy_log_filter_set` accepts a negative ``src_id`` and
+  indexes outside ``log_dynamic``
+* :github:`111431` - net: ip: forwarded packets keep their original TTL / hop-limit (no decrement
+  on the routing path)
+* :github:`111534` - Bluetooth: GATT: notify/indicate checks the declaration permissions, not the value
+  permissions, when passed a characteristic declaration
+* :github:`111564` - bluetooth: host: classic: l2cap_br: fix conf req/rsp length validation
+* :github:`111420` - debug: coredump/shell: check tgt code before using string array
+
+Security Vulnerability Related
+******************************
+
+The following security vulnerabilities (CVEs) were addressed in this
+release:
+
+* :cve:`2026-7656`: Under embargo until 2026-06-25
+* :cve:`2026-8023`: Under embargo until 2026-06-23
+* :cve:`2026-9263`: Under embargo until 2026-06-28
+* :cve:`2026-10593`: Under embargo until 2026-08-26
+* :cve:`2026-10634` `Zephyr project bug tracker GHSA-6c57-xfhw-j26x
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-6c57-xfhw-j26x>`_
+* :cve:`2026-10636` `Zephyr project bug tracker GHSA-fj6q-975v-65c9
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-fj6q-975v-65c9>`_
+* :cve:`2026-10637` `Zephyr project bug tracker GHSA-m23w-34pp-4h92
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-m23w-34pp-4h92>`_
+* :cve:`2026-10638`: Under embargo until 2026-08-20
+* :cve:`2026-10639` `Zephyr project bug tracker GHSA-qhrf-w466-qmpw
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-qhrf-w466-qmpw>`_
+* :cve:`2026-10640` `Zephyr project bug tracker GHSA-r74c-mr4m-7g9g
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-r74c-mr4m-7g9g>`_
+* :cve:`2026-10641` `Zephyr project bug tracker GHSA-wx5j-q6f2-59p3
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-wx5j-q6f2-59p3>`_
+* :cve:`2026-10642`: Under embargo until 2026-08-26
+* :cve:`2026-10643`: Under embargo until 2026-08-26
+* :cve:`2026-10645` `Zephyr project bug tracker GHSA-hwrh-9h3x-vccm
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-hwrh-9h3x-vccm>`_
+* :cve:`2026-10646`: Under embargo until 2026-08-26
+* :cve:`2026-10647`: Under embargo until 2026-08-26
+* :cve:`2026-10651` `Zephyr project bug tracker GHSA-p93g-3r68-cj53
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-p93g-3r68-cj53>`_
+* :cve:`2026-10652`: Under embargo until 2026-07-22
+* :cve:`2026-10653`: Under embargo until 2026-08-21
+* :cve:`2026-10654`: Under embargo until 2026-08-26
+* :cve:`2026-10655`: Under embargo until 2026-08-26
+* :cve:`2026-10657`: Under embargo until 2026-08-20
+* :cve:`2026-10658` `Zephyr project bug tracker GHSA-26g8-rmpf-j6cw
+  <https://github.com/zephyrproject-rtos/zephyr/security/advisories/GHSA-26g8-rmpf-j6cw>`_
+* :cve:`2026-10660`: Under embargo until 2026-08-26
+* :cve:`2026-10664`: Under embargo until 2026-06-28
+* :cve:`2026-10666`: Under embargo until 2026-07-09
+* :cve:`2026-10667`: Under embargo until 2026-07-11
+* :cve:`2026-10669`: Under embargo until 2026-08-20
+* :cve:`2026-10670`: Under embargo until 2026-08-20
+* :cve:`2026-10671`: Under embargo until 2026-08-20
+* :cve:`2026-10672`: Under embargo until 2026-06-25
+* :cve:`2026-10673`: Under embargo until 2026-07-15
+* :cve:`2026-10674`: Under embargo until 2026-08-28
+* :cve:`2026-10675`: Under embargo until 2026-08-26
+* :cve:`2026-10677`: Under embargo until 2026-08-26
+* :cve:`2026-10678`: Under embargo until 2026-08-21
+* :cve:`2026-10679`: Under embargo until 2026-08-26
+* :cve:`2026-10680`: Under embargo until 2026-08-09
+* :cve:`2026-10682`: Under embargo until 2026-08-25
+* :cve:`2026-10684`: Under embargo until 2026-08-28
+* :cve:`2026-10686`: Under embargo until 2026-08-30
+* :cve:`2026-10772`: Under embargo until 2026-09-01
+* :cve:`2026-10774`: Under embargo until 2026-09-01
+
+More detailed information can be found in:
+https://docs.zephyrproject.org/latest/security/vulnerabilities.html
+
+.. _zephyr_4.3.0:
+
 Zephyr 4.3.0
 ############
 

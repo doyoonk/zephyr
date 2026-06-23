@@ -904,10 +904,9 @@ static void tcp_conn_release(struct k_work *work)
 
 	k_mutex_unlock(&conn->lock);
 
+	k_mutex_lock(&tcp_lock, K_FOREVER);
 	net_context_unref(conn->context);
 	conn->context = NULL;
-
-	k_mutex_lock(&tcp_lock, K_FOREVER);
 	sys_slist_find_and_remove(&tcp_conns, &conn->next);
 	k_mutex_unlock(&tcp_lock);
 
@@ -2006,7 +2005,7 @@ static void tcp_resend_data(struct k_work *work)
  out:
 	k_mutex_unlock(&conn->lock);
 
-	if (conn_unref) {
+	if (conn_unref && conn->state != TCP_UNUSED && conn->state != TCP_CLOSED) {
 		tcp_conn_close(conn, -ETIMEDOUT);
 	}
 }
@@ -2314,7 +2313,7 @@ static enum net_verdict tcp_recv(struct net_conn *net_conn,
 	if (th_flags(th) & SYN && !(th_flags(th) & ACK)) {
 		struct tcp *conn_old = ((struct net_context *)user_data)->tcp;
 
-		if (tcp_backlog_is_full(conn_old)) {
+		if (conn_old == NULL || tcp_backlog_is_full(conn_old)) {
 			/* If the connection backlog is full, ignore the SYN
 			 * packet (same behavior as on Linux). Retransmitted SYN
 			 * attempts may be successful later.
@@ -3745,9 +3744,10 @@ int net_tcp_put(struct net_context *context, bool force_close)
 
 			keep_alive_timer_stop(conn);
 		}
-	} else if (conn->in_connect) {
+	} else if (conn->in_connect && conn->state != TCP_CLOSED && conn->state != TCP_UNUSED) {
 		conn->in_connect = false;
 		k_sem_reset(&conn->connect_sem);
+		tcp_conn_close(conn, -ECONNABORTED);
 	}
 
 	k_mutex_unlock(&conn->lock);
@@ -4512,10 +4512,19 @@ void net_tcp_foreach(net_tcp_cb_t cb, void *user_data)
 	k_mutex_lock(&tcp_lock, K_FOREVER);
 
 	SYS_SLIST_FOR_EACH_CONTAINER_SAFE(&tcp_conns, conn, tmp, next) {
+		/* Keep tcp_lock held while invoking the callback.
+		 * tcp_conn_release() removes entries from this list and
+		 * frees both conn->context and the conn slab under
+		 * tcp_lock, so dropping the lock here would allow a
+		 * concurrent release to free the *next* node saved by
+		 * the _SAFE iterator, causing a use-after-free when the
+		 * loop advances.
+		 *
+		 * All current callbacks are read-only diagnostics and
+		 * never acquire tcp_lock, so holding it is safe.
+		 */
 		if (atomic_get(&conn->ref_count) > 0) {
-			k_mutex_unlock(&tcp_lock);
 			cb(conn, user_data);
-			k_mutex_lock(&tcp_lock, K_FOREVER);
 		}
 	}
 
@@ -4758,10 +4767,16 @@ static void close_tcp_conn(struct tcp *conn, void *user_data)
 		return;
 	}
 
+	if (conn->state == TCP_CLOSED) {
+		return;
+	}
+
 	/* net_tcp_put() will handle decrementing refcount on stack's behalf */
 	if (net_context_get_state(context) != NET_CONTEXT_LISTENING) {
 		net_tcp_put(context, true);
 	} else {
+		k_mutex_lock(&conn->lock, K_FOREVER);
+
 		if (context->conn_handler) {
 			net_conn_unregister(context->conn_handler);
 			context->conn_handler = NULL;
@@ -4769,7 +4784,10 @@ static void close_tcp_conn(struct tcp *conn, void *user_data)
 
 		if (conn->accept_cb != NULL) {
 			conn->accept_cb(conn->context, NULL, 0, -ENETDOWN, context->user_data);
+			conn->accept_cb = NULL;
 		}
+
+		k_mutex_unlock(&conn->lock);
 	}
 }
 

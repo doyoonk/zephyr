@@ -95,8 +95,16 @@ static int32_t parse_response(uint8_t *data, uint16_t len, struct sntp_time *exp
 	}
 
 #if defined(CONFIG_SNTP_UNCERTAINTY)
+	struct timespec dest_ts;
+	int ret;
 
-	int64_t dest_ts_us = k_ticks_to_us_near64(k_uptime_ticks());
+	ret = sys_clock_gettime(SYS_CLOCK_REALTIME, &dest_ts);
+	if (ret < 0) {
+		return ret;
+	}
+
+	int64_t dest_ts_us = (USEC_PER_SEC * (int64_t)(dest_ts.tv_sec + OFFSET_1970_JAN_1)) +
+			     (dest_ts.tv_nsec / NSEC_PER_USEC);
 	int64_t orig_ts_us =
 		q32_32_s_to_ll_us(expected_orig_ts->seconds, expected_orig_ts->fraction);
 
@@ -325,13 +333,8 @@ int sntp_read_async(struct net_socket_service_event *event, struct sntp_time *ts
 
 void sntp_close_async(const struct net_socket_service_desc *service)
 {
-	struct sntp_ctx *ctx = service->pev->user_data;
-	/* Detach socket from socket service */
-	net_socket_service_unregister(service);
-	/* CLose the socket */
-	if (ctx) {
-		(void)zsock_close(ctx->sock.fd);
-	}
+	/* Detach socket from socket service with automatic close */
+	net_socket_service_close(service);
 }
 
 #endif /* CONFIG_NET_SOCKETS_SERVICE */
