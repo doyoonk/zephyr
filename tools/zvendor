@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+#
+# zvendor - Zephyr upstream tag importer for the internal zephyr.git bare repo.
+#
+# Repo layout (branches visible to developers):
+#
+#   main                      upstream minor baselines: v4.3.0 -> v4.4.0 -> v4.5.0 -> ...
+#     +-- b_v4.3              v4.3.1, v4.3.2, ... merged in order
+#     +-- b_v4.4              v4.4.1, v4.4.2, ... merged in order
+#     +-- b_v4.5              ...
+#
+# Internal bookkeeping refs (not branches, not fetched by a plain clone):
+#
+#   refs/vendor/lines/main    chain of depth-1 baseline snapshots
+#   refs/vendor/lines/v4.3    chain of depth-1 v4.3.x snapshots (forked at v4.3.0)
+#   refs/vendor/tags/<tag>    the single rewritten commit for one upstream tag
+#
+# Each upstream tag is fetched with --depth=1 and re-committed with commit-tree so
+# it carries exactly one commit and OUR parent, not upstream's history. Merging that
+# chain into main / b_vX.Y is a real 3-way merge, so internal modifications survive
+# every version bump.
+#
+set -euo pipefail
+
+REPO="${ZVENDOR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/zephyr.git}"
+UPSTREAM_URL="${ZVENDOR_UPSTREAM:-https://github.com/zephyrproject-rtos/zephyr.git}"
+
+# Vendor commits use a fixed identity and the upstream tag's own date, so importing
+# the same tag onto the same parent always yields the same commit hash. Do not change
+# these without re-importing everything.
+VENDOR_NAME="Zephyr Vendor Import"
+VENDOR_EMAIL="vendor@internal"
+
+g() { git --git-dir="$REPO" "$@"; }
+die() { echo "zvendor: $*" >&2; exit 1; }
+info() { echo ">> $*"; }
+
+# v4.3.1 -> v4.3
+line_of() { printf '%s' "${1%.*}"; }
+# v4.3.0 -> 0
+patch_of() { printf '%s' "${1##*.}"; }
+
+ref_exists() { g rev-parse --verify --quiet "$1" >/dev/null; }
+
+cmd_init() {
+    [ -e "$REPO" ] && die "$REPO already exists"
+    info "creating bare repo $REPO"
+    git init --bare --initial-branch=main "$REPO" >/dev/null
+    g remote add upstream "$UPSTREAM_URL"
+    g config remote.upstream.tagOpt --no-tags
+    g config gc.auto 0
+    g symbolic-ref HEAD refs/heads/main
+    info "done. upstream = $UPSTREAM_URL"
+}
+
+# commit-tree with the fixed vendor identity and the upstream tag's date.
+vendor_commit_tree() {
+    local tree="$1" date="$2" tag="$3"; shift 3
+    GIT_AUTHOR_NAME="$VENDOR_NAME"    GIT_AUTHOR_EMAIL="$VENDOR_EMAIL"    GIT_AUTHOR_DATE="$date" \
+    GIT_COMMITTER_NAME="$VENDOR_NAME" GIT_COMMITTER_EMAIL="$VENDOR_EMAIL" GIT_COMMITTER_DATE="$date" \
+    git --git-dir="$REPO" commit-tree "$tree" "$@" -m "zephyr $tag (upstream snapshot)"
+}
+
+# Fetch one tag at depth 1 and turn it into a single commit on its vendor line.
+vendor_import() {
+    local tag="$1" line parent lineref tagref tree commit tagdate
+    line="$(line_of "$tag")"
+    tagref="refs/vendor/tags/$tag"
+
+    if ref_exists "$tagref"; then
+        info "$tag already imported ($(g rev-parse --short "$tagref"))"
+        return 0
+    fi
+
+    if [ "$(patch_of "$tag")" = "0" ]; then
+        lineref="refs/vendor/lines/main"
+        parent="$(g rev-parse --verify --quiet "$lineref" || true)"
+    else
+        lineref="refs/vendor/lines/$line"
+        if ref_exists "$lineref"; then
+            parent="$(g rev-parse --verify "$lineref")"
+        else
+            ref_exists "refs/vendor/tags/${line}.0" \
+                || die "baseline ${line}.0 must be imported before $tag"
+            parent="$(g rev-parse --verify "refs/vendor/tags/${line}.0")"
+        fi
+    fi
+
+    info "fetching $tag (depth 1)"
+    g fetch --depth=1 --no-tags upstream "+refs/tags/$tag:refs/vendor/scratch"
+    tree="$(g rev-parse --verify "refs/vendor/scratch^{tree}")"
+    tagdate="$(g log -1 --format=%cI refs/vendor/scratch)"
+
+    if [ -n "$parent" ]; then
+        commit="$(vendor_commit_tree "$tree" "$tagdate" "$tag" -p "$parent")"
+    else
+        commit="$(vendor_commit_tree "$tree" "$tagdate" "$tag")"
+    fi
+
+    g update-ref "$lineref" "$commit"
+    g update-ref "$tagref" "$commit"
+    g update-ref -d refs/vendor/scratch
+    info "vendor commit $(g rev-parse --short "$commit") -> $lineref"
+}
+
+# 3-way merge SRC into branch BRANCH, no worktree needed unless it conflicts.
+merge_into() {
+    local branch="$1" src="$2" msg="$3" cur tree new rc out
+    cur="$(g rev-parse --verify --quiet "refs/heads/$branch" || true)"
+
+    if [ -z "$cur" ]; then
+        g update-ref "refs/heads/$branch" "$src"
+        info "created branch $branch at $(g rev-parse --short "$src")"
+        return 0
+    fi
+    if g merge-base --is-ancestor "$src" "$cur"; then
+        info "$branch already contains $(g rev-parse --short "$src")"
+        return 0
+    fi
+    if g merge-base --is-ancestor "$cur" "$src"; then
+        g update-ref "refs/heads/$branch" "$src" "$cur"
+        info "$branch fast-forwarded to $(g rev-parse --short "$src")"
+        return 0
+    fi
+
+    set +e
+    out="$(g merge-tree --write-tree --messages "$cur" "$src" 2>&1)"; rc=$?
+    set -e
+    if [ $rc -ne 0 ]; then
+        echo "$out" >&2
+        cat >&2 <<EOM
+
+zvendor: merge of $msg into $branch has conflicts.
+Resolve them in a worktree, then re-run this command:
+
+    git --git-dir=$REPO worktree add /tmp/zmerge-$branch $branch
+    cd /tmp/zmerge-$branch
+    git merge $src        # resolve, git add, git commit
+    cd - && git --git-dir=$REPO worktree remove /tmp/zmerge-$branch
+EOM
+        exit 1
+    fi
+
+    tree="$(printf '%s\n' "$out" | head -1)"
+    new="$(g commit-tree "$tree" -p "$cur" -p "$src" -m "Merge $msg into $branch")"
+    g update-ref "refs/heads/$branch" "$new" "$cur"
+    info "$branch <- merged $msg as $(g rev-parse --short "$new")"
+}
+
+cmd_add() {
+    local tag="$1" line branch
+    [ -d "$REPO" ] || die "$REPO not found, run: zvendor init"
+    case "$tag" in
+        v[0-9]*.[0-9]*.[0-9]*) ;;
+        *) die "expected a tag like v4.3.0, got '$tag'" ;;
+    esac
+    line="$(line_of "$tag")"
+
+    vendor_import "$tag"
+
+    if [ "$(patch_of "$tag")" = "0" ]; then
+        merge_into main "refs/vendor/tags/$tag" "zephyr $tag"
+        branch="b_$line"
+        if ref_exists "refs/heads/$branch"; then
+            info "branch $branch already exists"
+        else
+            g branch "$branch" main
+            info "created branch $branch from main"
+        fi
+    else
+        branch="b_$line"
+        ref_exists "refs/heads/$branch" || die "branch $branch missing, import ${line}.0 first"
+        merge_into "$branch" "refs/vendor/tags/$tag" "zephyr $tag"
+    fi
+}
+
+cmd_status() {
+    [ -d "$REPO" ] || die "$REPO not found"
+    echo "repo:     $REPO"
+    echo "upstream: $(g config --get remote.upstream.url)"
+    echo
+    echo "branches:"
+    g for-each-ref --format='  %(refname:short)  %(objectname:short)  %(contents:subject)' refs/heads
+    echo
+    echo "imported tags:"
+    g for-each-ref --format='  %(refname:lstrip=3)  %(objectname:short)' refs/vendor/tags \
+        | sort -V -k1
+    echo
+    echo "vendor lines:"
+    g for-each-ref --format='  %(refname:lstrip=3)  %(objectname:short)' refs/vendor/lines
+}
+
+cmd_available() {
+    local base
+    base="$(g for-each-ref --format='%(refname:lstrip=3)' refs/vendor/tags | sort -V | head -1)"
+    if [ -n "$base" ]; then
+        info "upstream release tags newer than the oldest imported one ($base), not yet imported:"
+    else
+        info "upstream release tags (nothing imported yet):"
+    fi
+    git ls-remote --tags "$UPSTREAM_URL" \
+        | grep -v '\^{}' | awk '{print $2}' | sed 's|refs/tags/||' \
+        | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V \
+    | while read -r t; do
+        [ -n "$base" ] && [ "$(printf '%s\n%s\n' "$base" "$t" | sort -V | head -1)" != "$base" ] && continue
+        ref_exists "refs/vendor/tags/$t" || echo "  $t"
+    done
+}
+
+# Push branches and the vendor bookkeeping refs to the remote.
+cmd_push() {
+    local remote="${1:-origin}"
+    g remote get-url "$remote" >/dev/null 2>&1 || die "remote '$remote' not configured"
+    info "pushing branches to $remote"
+    g push "$remote" main
+    g for-each-ref --format='%(refname:short)' 'refs/heads/b_*' \
+        | while read -r b; do g push "$remote" "$b"; done
+    info "pushing vendor refs to $remote"
+    g push "$remote" 'refs/vendor/*:refs/vendor/*'
+}
+
+cmd_gc() {
+    info "packing $REPO"
+    g reflog expire --expire=now --all || true
+    g gc --prune=now --aggressive
+    g count-objects -vH
+}
+
+usage() {
+    cat <<EOM
+usage: zvendor <command>
+
+  init              create the bare repo and register the upstream remote
+  add <tag>         import an upstream tag (vX.Y.0 -> main + branch b_vX.Y,
+                    vX.Y.Z -> branch b_vX.Y)
+  status            show branches, imported tags and vendor lines
+  push [remote]     push main, b_* and refs/vendor/* (default remote: origin)
+  available         list upstream release tags not yet imported
+  gc                repack the repo
+
+env:
+  ZVENDOR_REPO      bare repo path   (default: <this dir>/../zephyr.git)
+  ZVENDOR_UPSTREAM  upstream URL     (default: $UPSTREAM_URL)
+EOM
+}
+
+case "${1:-}" in
+    init)      shift; cmd_init "$@" ;;
+    add)       shift; [ $# -eq 1 ] || { usage; exit 1; }; cmd_add "$1" ;;
+    status)    shift; cmd_status ;;
+    push)      shift; cmd_push "${1:-origin}" ;;
+    available) shift; cmd_available ;;
+    gc)        shift; cmd_gc ;;
+    *)         usage; exit 1 ;;
+esac
