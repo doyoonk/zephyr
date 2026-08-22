@@ -38,7 +38,10 @@ export ZVENDOR_REPO=$ZEPHYR_WS/zephyr.git
 export ZEPHYR_WS=~/zephyrproject-rtos
 mkdir -p "$ZEPHYR_WS" && cd "$ZEPHYR_WS"
 git clone https://github.com/doyoonk/zephyr.git
-cd zephyr && git checkout b_v4.4
+cd zephyr
+git config merge.renameLimit 0    # rename 탐지 한계 해제, 아래 rename 절 참고
+git config diff.renameLimit 0
+git checkout b_v4.4
 ```
 
 ### upstream 태그를 임포트하는 경우 (릴리즈 담당자)
@@ -59,6 +62,8 @@ git --git-dir="$ZVENDOR_REPO" remote add upstream \
     https://github.com/zephyrproject-rtos/zephyr.git
 git --git-dir="$ZVENDOR_REPO" config remote.upstream.tagOpt --no-tags
 git --git-dir="$ZVENDOR_REPO" config gc.auto 0
+git --git-dir="$ZVENDOR_REPO" config merge.renameLimit 0
+git --git-dir="$ZVENDOR_REPO" config diff.renameLimit 0
 git --git-dir="$ZVENDOR_REPO" fetch origin \
     '+refs/heads/main:refs/heads/main' \
     '+refs/heads/b_*:refs/heads/b_*' \
@@ -281,6 +286,63 @@ git commit -am "meta: ..." && git push origin meta
 
 `zvendor push` 는 `main`, `b_*`, `refs/vendor/*` 만 push 하므로 `meta` 는 건드리지
 않습니다. 문서 변경은 위처럼 직접 push 하십시오.
+
+## 파일 이름이 바뀐 경우 (rename)
+
+Git 은 rename 을 기록하지 않고 머지할 때 유사도로 **추정**합니다. 이 방식에서도
+그대로 동작하지만, upstream 마이너 업그레이드는 한 번에 수천 개 파일을 옮기기
+때문에 탐지 한계가 실제 위험 요소입니다.
+
+실측 (v4.3.0 → v4.4.0):
+
+```
+추가 7111 / 삭제 1096 / 수정 11278 / rename 943
+```
+
+동작을 하나씩 확인한 결과입니다.
+
+| 상황 | 결과 |
+|---|---|
+| upstream 이 rename, 우리는 옛 경로를 수정 | 수정이 새 경로로 따라감, 충돌 없음 |
+| 우리가 `git mv`, upstream 이 옛 경로를 수정 | upstream 변경이 새 이름에 반영, 충돌 없음 |
+| 우리와 upstream 이 서로 다른 이름으로 rename | `CONFLICT (rename/rename)` — 수동 해결 필요 |
+| rename 탐지가 한계에 걸림 | `CONFLICT (modify/delete)` — **내부 수정이 옛 경로에 남고 새 경로에는 반영 안 됨** |
+
+마지막 행이 위험합니다. 탐지가 포기되면 git 은 "upstream 이 지운 파일을 우리가
+수정했다"로 해석합니다. 충돌로 보고되므로 조용히 유실되지는 않지만, 그대로
+`git rm` 해버리면 내부 수정이 사라집니다.
+
+그래서 rename 탐지 한계를 해제해 둡니다. bare 와 clone 모두에 설정하십시오.
+
+```sh
+git config merge.renameLimit 0    # 0 = 무제한
+git config diff.renameLimit 0
+```
+
+`zvendor init` 은 이 설정을 자동으로 넣고, `zvendor add` 는 머지할 때 매번
+명시적으로 해제한 채 실행하므로 저장소 설정과 무관하게 안전합니다. 수동으로
+부트스트랩했거나 남의 clone 에서 머지한다면 위 설정을 직접 넣으십시오.
+
+전체 zephyr 트리를 머지할 때 비용은 1.3초 → 2.2초 수준이라 끄고 쓸 이유가 없습니다.
+
+### rename/rename 충돌 해결
+
+우리와 upstream 이 같은 파일을 서로 다른 이름으로 옮기면 세 경로가 모두 남습니다.
+
+```
+CONFLICT (rename/rename): arch/posix/Linux.aarch64.cmake
+  renamed to arch/posix/internal_aarch64.cmake in HEAD
+  and to arch/posix/aarch64.cmake in refs/vendor/tags/v4.4.0
+```
+
+원칙적으로 **upstream 이름을 따르는 쪽**을 권장합니다. 내부 이름을 고집하면 다음
+릴리즈마다 같은 충돌이 반복됩니다.
+
+```sh
+git rm arch/posix/Linux.aarch64.cmake arch/posix/internal_aarch64.cmake
+git add arch/posix/aarch64.cmake      # 필요하면 내부 수정을 여기에 다시 적용
+git commit
+```
 
 ## 내부 수정 포워드 포트
 

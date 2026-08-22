@@ -51,6 +51,8 @@ cmd_init() {
     g remote add upstream "$UPSTREAM_URL"
     g config remote.upstream.tagOpt --no-tags
     g config gc.auto 0
+    g config merge.renameLimit 0
+    g config diff.renameLimit 0
     g symbolic-ref HEAD refs/heads/main
     info "done. upstream = $UPSTREAM_URL"
 }
@@ -126,7 +128,12 @@ merge_into() {
     fi
 
     set +e
-    out="$(g merge-tree --write-tree --messages "$cur" "$src" 2>&1)"; rc=$?
+    # Rename detection must not be capped here. An upstream release can rename
+    # thousands of files; if detection gives up, an internal change to a renamed
+    # file degrades into a modify/delete conflict and the change is left behind
+    # at the old path. Unlimited costs about a second on a full zephyr merge.
+    out="$(g -c merge.renameLimit=0 -c diff.renameLimit=0 \
+             merge-tree --write-tree --messages "$cur" "$src" 2>&1)"; rc=$?
     set -e
     if [ $rc -ne 0 ]; then
         echo "$out" >&2
