@@ -9,10 +9,28 @@ upstream `zephyrproject-rtos/zephyr` 의 **릴리즈 태그만** 가져와서 �
 
 ```
 /home/myrose/zephyrproject-rtos/
-├── zephyr.git          bare 저장소 (upstream 임포트 전용)
-├── tools/zvendor       임포트 도구
-└── README.md
+├── zephyr.git      bare 저장소 (upstream 임포트 전용)
+├── zephyr/         소스 작업용 clone — main, b_v4.3, b_v4.4
+└── zephyr-meta/    meta 브랜치 clone — README.md, tools/zvendor
 ```
+
+```sh
+git clone https://github.com/doyoonk/zephyr.git                                   # zephyr/
+git clone -b meta --single-branch https://github.com/doyoonk/zephyr.git zephyr-meta
+```
+
+- 소스 작업 → `zephyr/`
+- 문서/도구 수정, upstream 태그 임포트 → `zephyr-meta/`
+
+`tools/zvendor` 는 대상 bare 저장소를 **인자로 받습니다**. `zephyr-meta/` 에서
+실행할 때는 `--repo ../zephyr.git` 을 붙이거나, 셸에 한 번 export 해 두십시오.
+
+```sh
+export ZVENDOR_REPO=/home/myrose/zephyrproject-rtos/zephyr.git
+```
+
+우선순위는 `--repo` 인자 > `ZVENDOR_REPO` 환경변수 > 기본값(`<스크립트>/../zephyr.git`)
+입니다. 상대경로를 줘도 절대경로로 정규화되어 출력됩니다.
 
 > **`zephyr.git` 은 임포트 전용입니다.** 개발도 테스트도 여기서 하지 마십시오.
 > worktree 나 임시 브랜치를 만들면 원격까지 지저분해집니다.
@@ -88,7 +106,8 @@ git fetch origin 'refs/vendor/*:refs/vendor/*'
 ## 사용법 (임포트)
 
 ```sh
-cd /home/myrose/zephyrproject-rtos
+cd /home/myrose/zephyrproject-rtos/zephyr-meta
+export ZVENDOR_REPO=/home/myrose/zephyrproject-rtos/zephyr.git   # 또는 매번 --repo
 
 ./tools/zvendor status      # 브랜치 / 임포트된 태그 / vendor 라인
 ./tools/zvendor available   # 아직 안 가져온 upstream 릴리즈 태그 (v4.3.0 이후만)
@@ -96,6 +115,23 @@ cd /home/myrose/zephyrproject-rtos
 ./tools/zvendor add v4.4.3  # 패치 릴리즈: b_v4.4 에 머지
 ./tools/zvendor push        # main, b_*, refs/vendor/* 를 origin 으로 push
 ./tools/zvendor gc          # 재패킹
+```
+
+export 없이 쓰려면 매번 붙입니다.
+
+```sh
+./tools/zvendor --repo ../zephyr.git add v4.4.3
+```
+
+전체 옵션은 `./tools/zvendor --help` 로 확인하십시오.
+
+```
+usage: zvendor [options] <command>
+
+options:
+  -r, --repo <path>     bare repo to operate on
+  -u, --upstream <url>  upstream repository URL
+  -h, --help            this message
 ```
 
 `add` 는 태그 형식(`vX.Y.Z`)으로 대상을 자동 판별합니다.
@@ -111,21 +147,24 @@ cd /home/myrose/zephyrproject-rtos
 말고** clone 에서 해결한 뒤 push 하십시오.
 
 ```sh
-git clone https://github.com/doyoonk/zephyr.git /tmp/zfix && cd /tmp/zfix
+cd /home/myrose/zephyrproject-rtos/zephyr
 git fetch origin 'refs/vendor/*:refs/vendor/*'
 git checkout b_v4.4
 git merge refs/vendor/tags/v4.4.3     # 충돌 해결 → git add → git commit
 git push origin b_v4.4
 ```
 
-그 다음 bare 쪽에서 `git --git-dir=zephyr.git fetch origin '+refs/heads/*:refs/heads/*'`
-로 동기화합니다.
+그 다음 bare 를 동기화합니다.
+
+```sh
+git --git-dir=/home/myrose/zephyrproject-rtos/zephyr.git \
+    fetch origin '+refs/heads/*:refs/heads/*'
+```
 
 ## 개발 워크플로우
 
 ```sh
-git clone https://github.com/doyoonk/zephyr.git
-cd zephyr
+cd /home/myrose/zephyrproject-rtos/zephyr
 git checkout b_v4.4
 # 작업 후
 git push origin b_v4.4
@@ -158,22 +197,19 @@ zephyr 소스와 히스토리도 파일도 전혀 공유하지 않으므로, ups
 히스토리가 무관하므로 실수로 머지되지 않습니다 (Git 2.9+ 는
 `--allow-unrelated-histories` 를 명시해야만 허용). 절대 그렇게 하지 마십시오.
 
-### 확인 / 수정
+### 수정
+
+`zephyr-meta/` clone 에서 직접 고치고 push 합니다.
 
 ```sh
-git clone -b meta https://github.com/doyoonk/zephyr.git zephyr-meta
-cd zephyr-meta
+cd /home/myrose/zephyrproject-rtos/zephyr-meta
 # README.md / tools/zvendor 수정 후
-git push origin meta
+git commit -am "meta: ..." && git push origin meta
 ```
 
-기존 clone 안에서 보려면 별도 worktree 를 쓰는 편이 낫습니다. 같은 워킹트리에서
-`git checkout meta` 를 하면 59,518개 파일이 통째로 사라졌다 돌아오면서 빌드 캐시가
-무효화됩니다.
-
-```sh
-git worktree add ../zephyr-meta meta
-```
+`zephyr/` clone 에서 `git checkout meta` 는 하지 마십시오. 59,518개 파일이 통째로
+사라졌다 돌아오면서 빌드 캐시가 무효화됩니다. 굳이 한 워킹트리에서 다루려면
+`git worktree add ../zephyr-meta meta` 를 쓰십시오.
 
 `zvendor push` 는 `main`, `b_*`, `refs/vendor/*` 만 push 하므로 `meta` 는 건드리지
 않습니다. 문서 변경은 위처럼 직접 push 하십시오.

@@ -22,7 +22,9 @@
 #
 set -euo pipefail
 
-REPO="${ZVENDOR_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/zephyr.git}"
+# Bare repo path. Precedence: --repo argument > ZVENDOR_REPO env > default below.
+DEFAULT_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/zephyr.git"
+REPO="${ZVENDOR_REPO:-$DEFAULT_REPO}"
 UPSTREAM_URL="${ZVENDOR_UPSTREAM:-https://github.com/zephyrproject-rtos/zephyr.git}"
 
 # Vendor commits use a fixed identity and the upstream tag's own date, so importing
@@ -228,7 +230,7 @@ cmd_gc() {
 
 usage() {
     cat <<EOM
-usage: zvendor <command>
+usage: zvendor [options] <command>
 
   init              create the bare repo and register the upstream remote
   add <tag>         import an upstream tag (vX.Y.0 -> main + branch b_vX.Y,
@@ -238,11 +240,35 @@ usage: zvendor <command>
   available         list upstream release tags not yet imported
   gc                repack the repo
 
-env:
-  ZVENDOR_REPO      bare repo path   (default: <this dir>/../zephyr.git)
+options:
+  -r, --repo <path>     bare repo to operate on
+  -u, --upstream <url>  upstream repository URL
+  -h, --help            this message
+
+env (overridden by the options above):
+  ZVENDOR_REPO      bare repo path   (default: $DEFAULT_REPO)
   ZVENDOR_UPSTREAM  upstream URL     (default: $UPSTREAM_URL)
 EOM
 }
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --repo|-r)     [ $# -ge 2 ] || die "--repo needs a path"; REPO="$2"; shift 2 ;;
+        --repo=*)      REPO="${1#--repo=}"; shift ;;
+        --upstream|-u) [ $# -ge 2 ] || die "--upstream needs a URL"; UPSTREAM_URL="$2"; shift 2 ;;
+        --upstream=*)  UPSTREAM_URL="${1#--upstream=}"; shift ;;
+        -h|--help)     usage; exit 0 ;;
+        --)            shift; break ;;
+        -*)            die "unknown option: $1" ;;
+        *)             break ;;
+    esac
+done
+
+# normalise to an absolute path so messages and git --git-dir stay unambiguous
+case "$REPO" in
+    /*) ;;
+    *)  REPO="$(cd "$(dirname "$REPO")" 2>/dev/null && pwd)/$(basename "$REPO")" ;;
+esac
 
 case "${1:-}" in
     init)      shift; cmd_init "$@" ;;
