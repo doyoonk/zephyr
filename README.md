@@ -127,11 +127,11 @@ upstream 태그를 그대로 덮어쓰면 내부 수정이 사라집니다. 그�
 `refs/vendor/*` 아래 별도 커밋 체인으로 쌓고, 그 체인을 브랜치에 **머지**합니다.
 
 ```
-refs/vendor/lines/main    ●(v4.3.0) ───────────● (v4.4.0) ─────● (v4.5.0)
-                           │                    │
-refs/vendor/lines/v4.3     └─● (v4.3.1) ─● (v4.3.2)
-                                                │
-refs/vendor/lines/v4.4                          └─● (v4.4.1) ─● (v4.4.2)
+refs/vendor/lines/main    ● (v4.3.0) ───────────● (v4.4.0) ─────● (v4.5.0)
+                          │                     │
+refs/vendor/lines/v4.4    │                     └─● (v4.4.1) ─● (v4.4.2)
+                          │
+refs/vendor/lines/v4.3    └─● (v4.3.1) ─● (v4.3.2)
 ```
 
 각 `●` 는 upstream 트리 그대로에 **우리가 지정한 부모**를 붙인 단일 커밋입니다
